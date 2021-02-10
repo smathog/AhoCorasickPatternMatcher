@@ -1,25 +1,53 @@
 package com.StringMatching;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class Trie {
     private final Node root;
+    private final List<String> words;
 
     public Trie(List<String> patterns) {
-        root = new Node(false);
+        root = new Node(false, -1);
+        words = new ArrayList<>();
         for (String s : patterns) {
+            words.add(s);
             Node activeNode = root;
             for (int i = 0; i < s.length(); ++i) {
                 if (!activeNode.hasEdge(s.charAt(i)))
-                    activeNode.addEdge(new Edge(s.charAt(i), false));
+                    activeNode.addEdge(new Edge(s.charAt(i), false, -1));
                 activeNode = activeNode.getEdge(s.charAt(i)).getTo();
             }
-            activeNode.setWordEnd(true);
+            activeNode.setWordEnd(true, words.size() - 1);
         }
     }
+
+    public List<String> getWords() {
+        return words;
+    }
+
+    public List<HashSet<Integer>> findMatches(String text) {
+        ArrayList<HashSet<Integer>> matches = new ArrayList<>();
+        for (String s : words)
+            matches.add(new HashSet<>());
+        outerLoop:
+        for (int i = 0; i < text.length(); ++i) {
+            Node activeNode = root;
+            int offset = i;
+            while (offset < text.length() && activeNode.numEdges() != 0) {
+                char current = text.charAt(offset);
+                if (activeNode.hasEdge(current)) {
+                    activeNode = activeNode.getEdge(current).getTo();
+                    if (activeNode.isWordEnd())
+                        matches.get(activeNode.getWordIndex()).add(i);
+                    ++offset;
+                } else
+                    break;
+            }
+        }
+        return matches;
+    }
+
 
     //Print function based on the one found in this article:
     //https://www.baeldung.com/java-print-binary-tree-diagram
@@ -72,9 +100,11 @@ public class Trie {
     private class Node {
         private boolean wordEnd;
         private final HashMap<Character, Edge> edges;
+        private int wordIndex;
 
-        public Node(boolean wordEnd) {
+        public Node(boolean wordEnd, int wordIndex) {
             this.wordEnd = wordEnd;
+            this.wordIndex = wordIndex;
             edges = new HashMap<>();
         }
 
@@ -100,12 +130,24 @@ public class Trie {
             return wordEnd;
         }
 
-        public void setWordEnd(boolean wordEnd) {
+        public void setWordEnd(boolean wordEnd, int wordIndex) {
             this.wordEnd = wordEnd;
+            this.wordIndex = wordIndex;
         }
 
         public List<Edge> edgeList() {
             return new ArrayList<>(edges.values());
+        }
+
+        public int numEdges() {
+            return edges.size();
+        }
+
+        public int getWordIndex() {
+            if (!wordEnd)
+                throw new IllegalArgumentException("Cannot get wordIndex from non-terminal node!");
+            else
+                return wordIndex;
         }
     }
 
@@ -113,9 +155,9 @@ public class Trie {
         private final char c;
         private final Node to;
 
-        public Edge(char c, boolean wordEnd) {
+        public Edge(char c, boolean wordEnd, int wordIndex) {
             this.c = c;
-            to = new Node(wordEnd);
+            to = new Node(wordEnd, wordIndex);
         }
 
         public char getChar() {
