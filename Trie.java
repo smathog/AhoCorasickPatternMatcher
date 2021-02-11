@@ -13,8 +13,8 @@ public class Trie {
         words = new ArrayList<>();
         //Step 1: Build the trie
         buildTrie(patterns);
-        //Step 2: Construct failure/suffix links
-        buildFailureLinks();
+        //Step 2: Construct failure/suffix and dictionary links
+        buildLinks();
     }
 
     public List<String> getWords() {
@@ -59,12 +59,13 @@ public class Trie {
         }
     }
 
-    //Helper function that constructs the failure links for a newly constructed trie
+    //Helper function that constructs the failure and dictionary links for a newly constructed trie
     //Time complexity O(M) where M i the sum of the lengths of all patterns
-    private void buildFailureLinks() {
+    private void buildLinks() {
         ArrayDeque<Node> nodeQueue = new ArrayDeque<>();
-        //Rule 1: root has no failure link
-        //Rule 2: nodes one layer deeper than root have failure links pointing to root
+        //Failure Rule 1: root has no failure link
+        //Failure Rule 2: nodes one layer deeper than root have failure links pointing to root
+        //Note: all root and depth 1 nodes have null dictionary links, so no work to be done there
         for (Edge e : root.edges.values()) {
             Node current = e.getTo();
             current.setFailureLink(root);
@@ -74,21 +75,32 @@ public class Trie {
         //BFS while applying other rules
         while (!nodeQueue.isEmpty()) {
             Node current = nodeQueue.pollFirst();
+            //First: find current's failure link node
             Node linked = current.getEdgeIn().getFrom().getFailureLink();
             while (true) {
                 if (linked.hasEdge(current.getEdgeIn().getChar())) {
-                    //Rule 3: if linked has a edge and node corresponding to current's edgeIn character,
+                    //Failure Rule 3: if linked has a edge and node corresponding to current's edgeIn character,
                     //link current to that node
                     current.setFailureLink(linked.getEdge(current.getEdgeIn().getChar()).getTo());
                     break;
                 } else if (root == linked) {
-                    //Rule 4: if linked is root and doesn't satisfy rule 3, current is linked to root
+                    //Failure Rule 4: if linked is root and doesn't satisfy rule 3, current is linked to root
                     current.setFailureLink(root);
                     break;
                 } else
-                    //Rule 5: update linked and repeat until rule 3 or 4 applies
+                    //Failure Rule 5: update linked and repeat until rule 3 or 4 applies
                     linked = linked.getFailureLink();
             }
+            //Second: use the failure link to find current's dictionaryLink
+            Node currentLink = current.getFailureLink();
+            if (currentLink.isWordEnd()) {
+                //Dictionary Rule 1: if the failure link corresponds to a word, set current's dictionary link to it
+                current.setDictionaryLink(currentLink);
+            } else {
+                //Dictionary Rule 2: if rule 1 doesn't apply, set current's DL to it's failure link's DL.
+                current.setDictionaryLink(currentLink.getDictionaryLink());
+            }
+            //Third: add next layer of nodes into queue to continue BFS
             for (Edge e : current.edges.values())
                 nodeQueue.add(e.getTo());
         }
@@ -148,11 +160,13 @@ public class Trie {
         private boolean wordEnd;
         private final HashMap<Character, Edge> edges;
         private Node failureLink;
+        private Node dictionaryLink;
         private int wordIndex;
 
         public Node(Edge edgeIn, boolean wordEnd, int wordIndex) {
             this.edgeIn = edgeIn;
             this.failureLink = null;
+            this.dictionaryLink = null;
             this.wordEnd = wordEnd;
             this.wordIndex = wordIndex;
             edges = new HashMap<>();
@@ -204,16 +218,20 @@ public class Trie {
                 return wordIndex;
         }
 
-        public boolean hasFailureLink() {
-            return failureLink != null;
-        }
-
         public void setFailureLink(Node other) {
             this.failureLink = other;
         }
 
         public Node getFailureLink() {
             return failureLink;
+        }
+
+        public void setDictionaryLink(Node other) {
+            this.dictionaryLink = other;
+        }
+
+        public Node getDictionaryLink() {
+            return dictionaryLink;
         }
     }
 
