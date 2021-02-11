@@ -9,7 +9,7 @@ public class Trie {
 
     //Constructs an Aho-Corasick Automaton for a given List of patterns
     public Trie(List<String> patterns) {
-        root = new Node(null, false, -1);
+        root = new Node(null, false, -1, 0);
         words = new ArrayList<>();
         //Step 1: Build the trie
         buildTrie(patterns);
@@ -39,6 +39,37 @@ public class Trie {
                     ++offset;
                 } else
                     break;
+            }
+        }
+        return matches;
+    }
+
+    //Aho-Corasick search algorithm over the fully constructed trie
+    //Time complexity O(N + Z) where N = |text|, Z is the number of matches over all patterns found in text
+    public List<HashSet<Integer>> findMatchesAC(String text) {
+        ArrayList<HashSet<Integer>> matches = new ArrayList<>();
+        for (String s : words)
+            matches.add(new HashSet<>());
+        Node activeNode = root;
+        for (int i = 0; i < text.length(); ++i) {
+            char c = text.charAt(i);
+            while (!activeNode.hasEdge(c)) {
+                if (activeNode == root)
+                    break;
+                else
+                    activeNode = activeNode.getFailureLink();
+            }
+            //If activeNode has an edge matching the current char inspected, follow it
+            if (activeNode.hasEdge(c))
+                activeNode = activeNode.getEdge(c).getTo();
+            //If activeNode now corresponds to a word, save the match
+            if (activeNode.isWordEnd())
+                matches.get(activeNode.getWordIndex()).add(i - activeNode.getDepth() + 1);
+            //Follow any valid chain of dictionary links to save these possible matches
+            Node dictNode = activeNode.getDictionaryLink();
+            while (dictNode != null) {
+                matches.get(dictNode.getWordIndex()).add(i - dictNode.getDepth() + 1);
+                dictNode = dictNode.getDictionaryLink();
             }
         }
         return matches;
@@ -106,7 +137,6 @@ public class Trie {
         }
     }
 
-
     //Print function based on the one found in this article:
     //https://www.baeldung.com/java-print-binary-tree-diagram
     @Override
@@ -162,13 +192,15 @@ public class Trie {
         private Node failureLink;
         private Node dictionaryLink;
         private int wordIndex;
+        private final int depth;
 
-        public Node(Edge edgeIn, boolean wordEnd, int wordIndex) {
+        public Node(Edge edgeIn, boolean wordEnd, int wordIndex, int depth) {
             this.edgeIn = edgeIn;
             this.failureLink = null;
             this.dictionaryLink = null;
             this.wordEnd = wordEnd;
             this.wordIndex = wordIndex;
+            this.depth = depth;
             edges = new HashMap<>();
         }
 
@@ -233,6 +265,10 @@ public class Trie {
         public Node getDictionaryLink() {
             return dictionaryLink;
         }
+
+        public int getDepth() {
+            return depth;
+        }
     }
 
     private class Edge {
@@ -243,7 +279,7 @@ public class Trie {
         public Edge(Node from, char c, boolean wordEnd, int wordIndex) {
             this.from = from;
             this.c = c;
-            to = new Node(this, wordEnd, wordIndex);
+            to = new Node(this, wordEnd, wordIndex, from.getDepth() + 1);
         }
 
         public char getChar() {
